@@ -6,15 +6,25 @@ import { Store, create, valueOf } from 'microstates';
 import noble from '@s524797336/noble-mac';
 
 import UI from './ui';
-import Bluetooth from '../src/bluetooth'
+import { Effects, Matcher } from './controller';
+import Bluetooth from '../src/bluetooth';
+
 
 let renderer = (...args) => {
   renderer = render(...args).rerender;
 };
 
-let initial = create(Bluetooth, {type: 'Off', scan: { type: 'Idle', value: null }, peripherals: {}});
+let initial = create(Bluetooth, {type: 'Off', peripherals: {}});
 
-let bluetooth = Store(initial, Effects([currentReference, repaint, bluetoothController, scanController]));
+let controller = Effects([
+  currentReference,
+  repaint,
+  Matcher(bluetooth => bluetooth.isOn, bluetooth => bluetooth.startScanning()),
+  Matcher(bluetooth => bluetooth.scan.isActivating, () => noble.startScanning([], true)),
+  Matcher(bluetooth => bluetooth.scan.isDeactivating, () => noble.stopScanning())
+]);
+
+let bluetooth = Store(initial, controller);
 
 noble.on('stateChange', state => {
   if (state === 'poweredOn') {
@@ -24,42 +34,19 @@ noble.on('stateChange', state => {
   }
 });
 
+noble.on('scanStart', () => bluetooth.scan.didActivate())
+noble.on('scanStop', () => bluetooth.scan.didDeactivate())
+
 noble.on('discover', peripheral => {
   bluetooth.peripherals.put(peripheral.id, peripheral);
 });
-
-function Effects(effects) {
-  return state => effects.forEach(effect => effect(state));
-}
-
-function log(event, cb = x => x) {
-  return (...args) => { console.log(`${event}(${args.join(',')})`)}
-
-}
 
 function currentReference(state) {
   bluetooth = state;
 }
 
- function repaint(state) {
-   renderer(<UI bluetooth={bluetooth}/>);
- }
-
-function bluetoothController(bluetooth) {
-  if (bluetooth.isOn) {
-    bluetooth.startScanning();
-  }
-}
-
-function scanController(bluetooth) {
-  let { scan } = bluetooth;
-  if (scan.isActivating) {
-    let active = scan.activate();
-    noble.startScanning([], true);
-  } else if (scan.isDeactivating) {
-    scan.deactivate();
-    noble.stopScanning();
-  }
+function repaint(state) {
+  renderer(<UI bluetooth={bluetooth}/>);
 }
 
 repaint(bluetooth);

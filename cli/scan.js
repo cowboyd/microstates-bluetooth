@@ -12,8 +12,8 @@ export default function Scan({ scan }) {
 }
 
 function Status({ scan }) {
-  if (scan.isIdle) {
-    return <Text italic={true}>Idle</Text>
+  if (scan.isInactive) {
+    return <Text italic={true}>Inactive</Text>
   } else {
     return (
       <Fragment>

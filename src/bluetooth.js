@@ -1,41 +1,32 @@
 import Union from '@microstates/union';
 
-import Scan from './scan';
+import Effect from './effect';
 import Peripheral from './peripheral';
 
-class Bluetooth {
-  scan = Scan.Idle.create();
+export default class Bluetooth {
+  get isOn() { return this.power.isActive; }
+  get isOff() { return this.power.isInactive; }
+
+  power = Effect.Inactive.create();
+  scan = Effect.Inactive.create();
+
   peripherals = { Peripheral };
-}
 
-export default Union({
-  On: Bluetooth => class extends Bluetooth {
+  powerOn() {
+    return this
+      .power.activate();
 
-    startScanning() {
-      return this.scan.activate();
-    }
-
-    stopScanning() {
-      return this.scan.stop();
-    }
-
-    powerOn() {
-      return this;
-    }
-
-    powerOff() {
-      return this
-        .scan.deactivate()
-        .peripherals.set({})
-        .toOff();
-    }
-  },
-  Off: Bluetooth => class extends Bluetooth {
-    powerOn() {
-      return this.toOn();
-    }
-    powerOff() {
-      return this;
-    }
   }
-}, Bluetooth);
+
+  powerOff() {
+    return this
+      .power.reset()
+      .scan.reset()
+      .peripherals.set({});
+  }
+
+  startScanning() {
+    return this
+      .scan.willActivate();
+  }
+}
